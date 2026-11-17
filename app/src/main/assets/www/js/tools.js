@@ -14,7 +14,11 @@ const Tools = (() => {
     ['toolTest', 'help', 'اختبر حفظك', 'أكمل من حيث تقف الآية'],
     ['toolListen', 'headphones', 'الاستماع والترديد', 'قارئ متقن مع تكرار الآية والمقطع'],
     ['toolRecite', 'mic', 'سمِّع وسجّل', 'أخفِ النص وسجّل تسميعك ثم طابقه'],
-    ['toolMarks', 'flag', 'مواضع الخطأ والمتشابهات', 'الآيات التي علّمتها للمراجعة'],
+    ['toolMarks', 'bookmark', 'العلامات المرجعية', 'علاماتك مقسّمة كما تحب'],
+    ['toolKhatma', 'book', 'ختمة التلاوة', 'تابع ختمتك وورد قراءتك اليومي'],
+    ['toolSearch', 'search', 'البحث في المصحف', 'ابحث عن كلمة ولو بلا تشكيل'],
+    ['toolTafsir', 'text', 'التفاسير', 'الطبري وابن كثير والبغوي والمختصر…'],
+    ['toolDownloads', 'download', 'التحميلات', 'تلاوات وتفاسير وطبعات دون إنترنت'],
     ['toolTimer', 'timer', 'مؤقّت التركيز', 'جلسة حفظ بلا مشتّتات'],
     ['toolGuide', 'book', 'دليل الطرق', 'شرح الحصون الخمسة وبقية الطرق'],
   ];
@@ -35,12 +39,15 @@ const Tools = (() => {
         ${C.ranges ? `<p class="mut c">${F.ranges(C.ranges)}</p>${textBox(gids)}` : '<p class="mut c">عدّاد حر — افتحه من المصحف ليظهر نص المقطع هنا.</p>'}
         <p class="lbl">الهدف</p>${W.chips('cntTarget', [[3, '٣'], [5, '٥'], [7, '٧'], [10, '١٠'], [20, '٢٠'], [40, '٤٠'], [100, '١٠٠']], C.target)}
         <button class="bigtap" id="cnt" data-a="cntTap">${cntBody()}</button>
-        <p class="c mut" id="cnt-r">الجولات المكتملة: ${num(C.rounds)} · مجموع تكرارك: ${num(S().stats.reps)}</p>
+        <p class="c mut sm">تُتجاهل الضغطة المكرّرة خطأً خلال أقل من ثانية.</p><p class="c mut" id="cnt-r">الجولات المكتملة: ${num(C.rounds)} · مجموع تكرارك: ${num(S().stats.reps)}</p>
         <div class="row gap"><button class="btn grow" data-a="cntReset">${ic('refresh')} تصفير</button></div></div>`;
       screenOn(true);
     }, () => screenOn(false));
   };
+  let lastTap = 0;
+  const dbl = () => { const n = Date.now(); if (n - lastTap < 700) return true; lastTap = n; return false; }; // ignore accidental double taps
   Act.cntTap = () => {
+    if (dbl()) return;
     C.n++; S().stats.reps++; Store.save(); UI.vibrate(15);
     if (C.n >= C.target) { C.rounds++; UI.vibrate([80, 60, 160]); UI.toast('أتممت العدد المطلوب، أحسنت'); $('#cnt').innerHTML = cntBody(); C.n = 0; Badges.check(); }
     else $('#cnt').innerHTML = cntBody();
@@ -95,6 +102,7 @@ const Tools = (() => {
   Act.takM = el => { S().cfg.linkRepeat = +el.dataset.v; Store.save(); takrar(K.ranges); };
   Act.takGo = () => { if (!K.ranges) K.ranges = readRange('tk'); if (!K.ranges) return; UI.closeSheet(); takStart(); };
   Act.takTap = () => {
+    if (dbl()) return;
     const s = K.steps[K.i]; K.n++; S().stats.reps++; Store.save(); UI.vibrate(15);
     if (K.n >= s.n) { K.i++; K.n = 0; UI.vibrate([80, 60, 160]); Badges.check(); }
     UI.refresh();
@@ -148,7 +156,7 @@ const Tools = (() => {
   Act.testSkip = () => { pick(); UI.refresh(); };
   Act.testGrade = el => {
     const ok = el.dataset.v === '1'; T.all++; S().stats.testAll++;
-    if (ok) { T.ok++; S().stats.testOk++; } else { S().marks[T.g + 1] = S().marks[T.g + 1] || 'e'; }
+    if (ok) { T.ok++; S().stats.testOk++; } else { S().marks[T.g + 1] = S().marks[T.g + 1] || S().cats.marks[0] || 'مواضع الخطأ'; }
     Store.save(); Badges.check(); pick(); UI.refresh();
   };
   Act.toolTest = () => {
@@ -191,18 +199,24 @@ const Tools = (() => {
   };
   Act.reciteGo = () => { const r = readRange('rc'); UI.closeSheet(); Mushaf.open({ ranges: r, title: 'تسميع', hide: true }); Rec.start({ label: 'تسميع — ' + F.ranges(r), g: r[0][0] }); };
 
-  /* ---------- mistakes & mutashabihat ---------- */
-  Act.toolMarks = () => UI.push('مواضع الخطأ والمتشابهات', root => {
-    const ks = Object.keys(S().marks).map(Number).sort((a, b) => a - b);
-    root.innerHTML = ks.length ? `<div class="pad">${ks.map(g => `<div class="card mk"><div class="row"><span class="tag ${S().marks[g] === 'e' ? 'red' : ''}">${S().marks[g] === 'e' ? 'خطأ' : 'متشابه'}</span><b class="grow">${F.ayahRef(g)}</b>
-        <button class="ib sm" data-a="mkOpen" data-g="${g}">${ic('book')}</button><button class="ib sm" data-a="mkDel" data-g="${g}">${ic('trash')}</button></div><p class="qline">${W.ayah(g)}</p></div>`).join('')}
-        <button class="btn pri grow" data-a="mkTest">${ic('target')} اختبرني في هذه المواضع</button></div><div class="sp"></div>`
-      : W.empty('flag', 'لا مواضع معلّمة', 'اضغط أي آية في المصحف وعلّمها «موضع خطأ» أو «متشابه» لتجتمع هنا.');
+  /* ---------- bookmarks in user-defined groups ---------- */
+  let mkCat = '';
+  Act.toolMarks = () => UI.push('العلامات المرجعية', root => {
+    const all = Object.keys(S().marks).map(Number).sort((a, b) => a - b), cats = S().cats.marks;
+    if (mkCat && !cats.includes(mkCat)) mkCat = '';
+    const ks = all.filter(g => !mkCat || S().marks[g] === mkCat);
+    root.innerHTML = `<div class="pad">${W.chips('mkCat', [['', `الكل (${num(all.length)})`]].concat(cats.map(c => [c, `${c} (${num(all.filter(g => S().marks[g] === c).length)})`])), mkCat)}
+      <button class="btn sm mt8" data-a="catsManage" data-k="marks">${ic('folder')} إدارة التقسيمات</button>
+      <div class="mt8">${ks.length ? ks.map(g => `<div class="card mk"><div class="row"><span class="tag ${S().marks[g] === cats[0] ? 'red' : ''}">${esc(S().marks[g])}</span><b class="grow">${F.ayahRef(g)}</b>
+        <button class="ib sm" data-a="mkOpen" data-g="${g}">${ic('book')}</button><button class="ib sm" data-a="mkDel" data-g="${g}">${ic('trash')}</button></div><p class="qline">${W.ayah(g)}</p></div>`).join('')
+        + `<button class="btn pri grow" data-a="mkTest">${ic('target')} اختبرني في هذه المواضع</button>`
+      : W.empty('bookmark', 'لا علامات هنا', 'اضغط أي آية في المصحف ثم «علامة مرجعية» واختر التقسيمة أو أنشئ تقسيمة باسمك.')}</div></div><div class="sp"></div>`;
   });
-  Act.mkOpen = el => Mushaf.open({ ranges: [[+el.dataset.g, +el.dataset.g]], title: 'موضع للمراجعة' });
+  Act.mkCat = el => { mkCat = el.dataset.v; UI.refresh(); };
+  Act.mkOpen = el => Mushaf.open({ ranges: [[+el.dataset.g, +el.dataset.g]], title: S().marks[+el.dataset.g] || 'علامة' });
   Act.mkDel = el => { delete S().marks[+el.dataset.g]; Store.save(); UI.refresh(); };
   Act.mkTest = () => { // ask about the ayah before each marked one
-    const gs = Object.keys(S().marks).map(g => +g - 1).filter(g => g >= 0);
+    const gs = Object.keys(S().marks).map(Number).filter(g => !mkCat || S().marks[g] === mkCat).map(g => g - 1).filter(g => g >= 0).sort((a, b) => a - b);
     test(Q.toRanges(gs));
     if (T.g < 0) { UI.pop(); UI.toast('علّم هذه الآيات محفوظةً أولًا لتُختبر فيها'); }
   };

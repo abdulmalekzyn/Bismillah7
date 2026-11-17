@@ -15,6 +15,8 @@ const Blobs = (() => {
     put: (id, blob) => tx('readwrite', s => s.put(blob, id)),
     get: id => tx('readonly', s => s.get(id)),
     del: id => tx('readwrite', s => s.delete(id)),
+    keys: prefix => tx('readonly', s => s.getAllKeys(IDBKeyRange.bound(prefix, prefix + '\uffff'))),
+    delPrefix: prefix => tx('readwrite', s => s.delete(IDBKeyRange.bound(prefix, prefix + '\uffff'))),
   };
 })();
 
@@ -45,14 +47,14 @@ const Rec = (() => {
   const start = async m => {
     if (mr) return;
     if (!navigator.mediaDevices || !window.MediaRecorder) { UI.toast('التسجيل غير مدعوم على هذا الجهاز'); return; }
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true } }); }
     catch (e) { UI.toast('لم يُسمح باستخدام الميكروفون'); return; }
     Player.stop();
     meta = m || { label: 'تسجيل حر' }; chunks = [];
-    mr = new MediaRecorder(stream);
+    try { mr = new MediaRecorder(stream, { audioBitsPerSecond: 64000 }); } catch (e) { mr = new MediaRecorder(stream); }
     mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
     mr.onstop = finish;
-    mr.start(1000); t0 = Date.now();
+    mr.start(); t0 = Date.now(); // one chunk at stop: fewer wake-ups while reciting
     dock();
     tick = setInterval(() => { const el = $('#rec-t'); if (el) el.textContent = F.dur((Date.now() - t0) / 1000); }, 500);
     if (Native && Native.keepScreenOn) Native.keepScreenOn(true);
@@ -89,18 +91,45 @@ const RECITERS = [
   ['Alafasy_64kbps', 'مشاري العفاسي'],
   ['Hudhaify_64kbps', 'علي الحذيفي'],
   ['Ayman_Sowaid_64kbps', 'أيمن سويد'],
+  ['Minshawy_Mujawwad_192kbps', 'المنشاوي (مجوّد)'],
+  ['Abdul_Basit_Mujawwad_128kbps', 'عبد الباسط (مجوّد)'],
+  ['Abdurrahmaan_As-Sudais_192kbps', 'عبد الرحمن السديس'],
+  ['Saood_ash-Shuraym_128kbps', 'سعود الشريم'],
+  ['MaherAlMuaiqly128kbps', 'ماهر المعيقلي'],
+  ['Abu_Bakr_Ash-Shaatree_128kbps', 'أبو بكر الشاطري'],
+  ['Muhammad_Ayyoub_128kbps', 'محمد أيوب'],
+  ['Nasser_Alqatami_128kbps', 'ناصر القطامي'],
+  ['Yasser_Ad-Dussary_128kbps', 'ياسر الدوسري'],
+  ['Ghamadi_40kbps', 'سعد الغامدي'],
+  ['Abdullah_Basfar_192kbps', 'عبد الله بصفر'],
+  ['Muhammad_Jibreel_128kbps', 'محمد جبريل'],
+  ['Hani_Rifai_192kbps', 'هاني الرفاعي'],
+  ['Ali_Jaber_64kbps', 'علي جابر'],
+  ['Fares_Abbad_64kbps', 'فارس عباد'],
+  ['Salah_Al_Budair_128kbps', 'صلاح البدير'],
+  ['Abdullaah_3awwaad_Al-Juhaynee_128kbps', 'عبد الله عواد الجهني'],
+  ['Khalefa_Al_Tunaiji_64kbps', 'خليفة الطنيجي'],
+  ['Ibrahim_Akhdar_32kbps', 'إبراهيم الأخضر'],
 ];
 const Player = (() => {
   const au = new Audio(); au.preload = 'auto';
   let list = [], i = 0, rep = 0, loops = 0, opts = null, on = false, gapT = null, fails = 0;
-  const url = g => { const r = Q.ref(g); return `https://everyayah.com/data/${Store.S.cfg.reciter}/${String(r.s + 1).padStart(3, '0')}${String(r.a).padStart(3, '0')}.mp3`; };
+  const file = g => { const r = Q.ref(g); return `${String(r.s + 1).padStart(3, '0')}${String(r.a).padStart(3, '0')}.mp3`; };
+  const remote = (rec, g) => `https://everyayah.com/data/${rec}/${file(g)}`;
+  const local = (rec, g) => `audio/${rec}/${file(g)}`;
+  const url = g => { // downloaded copy first, then streaming
+    const rec = Store.S.cfg.reciter, p = local(rec, g);
+    try { if (Native && Native.fileExists && Native.fileExists(p)) return '/dl/' + p; } catch (e) {}
+    return remote(rec, g);
+  };
+  const recName = () => (RECITERS.find(r => r[0] === Store.S.cfg.reciter) || ['', ''])[1];
   const cur = () => (on ? list[i] : -1);
   const emit = () => document.dispatchEvent(new CustomEvent('playerayah', { detail: cur() }));
   const dock = () => {
     let d = $('#play-dock');
     if (!on) { if (d) d.remove(); return; }
     if (!d) { d = document.createElement('div'); d.id = 'play-dock'; d.className = 'dockbar'; $('#dock').appendChild(d); }
-    d.innerHTML = `<button class="ib" data-a="playToggle">${ic(au.paused && !gapT ? 'play' : 'pause')}</button><div class="grow"><b>${F.ayahRef(list[i])}</b><small>${num(i + 1)}/${num(list.length)}${opts.each > 1 ? ` · تكرار ${num(rep + 1)}/${num(opts.each)}` : ''}${opts.loop > 1 ? ` · دورة ${num(loops + 1)}/${num(opts.loop)}` : ''}</small></div><button class="ib" data-a="playPrev">${ic('prev')}</button><button class="ib" data-a="playNext">${ic('next')}</button><button class="ib" data-a="playStop">${ic('x')}</button>`;
+    d.innerHTML = `<button class="ib" data-a="playToggle">${ic(au.paused && !gapT ? 'play' : 'pause')}</button><div class="grow" data-a="reciterPick"><b>${F.ayahRef(list[i])}</b><small>${esc(recName())} · ${num(i + 1)}/${num(list.length)}${opts.each > 1 ? ` · تكرار ${num(rep + 1)}/${num(opts.each)}` : ''}${opts.loop > 1 ? ` · دورة ${num(loops + 1)}/${num(opts.loop)}` : ''}</small></div><button class="ib" data-a="playPrev">${ic('prev')}</button><button class="ib" data-a="playNext">${ic('next')}</button><button class="ib" data-a="playStop">${ic('x')}</button>`;
   };
   const load = () => { au.src = url(list[i]); au.play().catch(() => {}); dock(); emit(); };
   const advance = () => {
@@ -136,7 +165,8 @@ const Player = (() => {
   Act.playStop = () => stop();
   Act.playNext = () => { clearTimeout(gapT); gapT = null; rep = 0; i = Math.min(i + 1, list.length - 1); load(); };
   Act.playPrev = () => { clearTimeout(gapT); gapT = null; rep = 0; i = Math.max(i - 1, 0); load(); };
-  return { play, stop, cur, get on() { return on; } };
+  const restart = () => { if (on) { rep = 0; load(); } };
+  return { play, stop, cur, remote, local, recName, restart, get on() { return on; } };
 })();
 
 const beep = () => {

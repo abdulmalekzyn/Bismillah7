@@ -67,12 +67,13 @@ const Today = (() => {
     const done = tasks.filter(t => t.done).length, st = Plan.streak();
     let html = `<header class="hero">
       <div class="hero-top"><div><h1>السلام عليكم${S.name ? ' يا ' + esc(S.name) : ''}</h1><p>${F.date(date)}${F.hijri(date) ? ' · ' + F.hijri(date) : ''}</p></div>
-      <button class="ib light" data-a="openSettings" aria-label="الإعدادات">${ic('gear')}</button></div>
+      <div class="row" style="gap:6px"><button class="ib light" data-a="themeToggle" aria-label="الوضع الليلي أو النهاري">${ic(UI.isDark() ? 'sun' : 'moon')}</button><button class="ib light" data-a="openSettings" aria-label="الإعدادات">${ic('gear')}</button></div></div>
       <div class="hero-main">${W.ring(tasks.length ? done / tasks.length : 0, 92, `${num(done)}/${num(tasks.length)}`, 'ورد اليوم')}
         <div class="hero-stats"><div><span class="flame">${ic('flame')}</span><b>${num(st)}</b><small>يوم مواظبة</small></div>
         <div><b>${num(Math.round(Plan.memPages() * 10) / 10)}</b><small>صفحة محفوظة</small></div></div></div>
     </header>
     <section class="card quote">${quote()}</section>
+    ${Khatma.card()}
     <button class="method-chip" data-a="methodInfo">${ic('layers')}<span>خطتك: <b>${Plan.METHODS[S.method].name}</b></span>${ic('next')}</button>`;
     if (!tasks.length) html += W.empty('star', 'لا أوراد اليوم', 'فعّل بعض الأوراد من الإعدادات، أو حدّد ما تحفظه لتظهر لك المراجعة.');
     const idx = tasks.map((t, i) => i);

@@ -47,6 +47,7 @@ const Q = (() => {
 
 /* ===== formatting ===== */
 const num = x => Number(x).toLocaleString('ar-EG', { maximumFractionDigits: 1, useGrouping: false });
+const bare = s => String(s).replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/\s+/g, ' ').trim();
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const F = {
   range([a, b]) {
@@ -109,6 +110,8 @@ const Store = (() => {
     ptr: { far: 0, tilawa: 0, listen: 0, manzil: 0 },
     days: {}, week: null, srs: [],
     notes: [], marks: {}, recs: [], files: [],
+    cats: { notes: ['عامة', 'تدبّر', 'تفسير', 'متشابهات', 'أخطاء التلاوة', 'تجويد'], marks: ['مواضع الخطأ', 'المتشابهات', 'علامات القراءة'] },
+    khatma: null, khatmaDone: 0,
     stats: { reps: 0, testOk: 0, testAll: 0, focusMin: 0 },
     badges: {},
     reminders: [
@@ -116,7 +119,7 @@ const Store = (() => {
       { h: 17, m: 0, on: 0, label: 'ورد المراجعة' },
       { h: 21, m: 30, on: 0, label: 'التحضير الليلي' },
     ],
-    ui: { theme: 'auto', font: 26, page: 1, hide: 'all' },
+    ui: { theme: 'auto', font: 26, page: 1, hide: 'all', edition: 'text', tafsir: 'ar-tafsir-al-mukhtasar' },
   });
   let S = defaults(), timer = null;
   const merge = (base, saved) => {
@@ -132,6 +135,10 @@ const Store = (() => {
       const o = typeof raw === 'string' ? JSON.parse(raw) : raw;
       if (o && o.v === 1) merge(S, o);
       if (!Array.isArray(S.mem) || S.mem.length !== Q.N) S.mem = new Array(Q.N).fill(0);
+      for (const g in S.marks) { // older versions stored 'e' / 'm'
+        if (S.marks[g] === 'e') S.marks[g] = 'مواضع الخطأ'; else if (S.marks[g] === 'm') S.marks[g] = 'المتشابهات';
+        if (!S.cats.marks.includes(S.marks[g])) S.cats.marks.push(S.marks[g]);
+      }
     } catch (e) { /* keep defaults */ }
     return S;
   };

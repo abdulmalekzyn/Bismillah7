@@ -3,7 +3,7 @@
 const Journal = (() => {
   const S = () => Store.S;
   let tab = 'notes', flt = '', cat = '';
-  const NCATS = ['عامة', 'تدبّر', 'تفسير', 'متشابهات', 'أخطاء التلاوة', 'تجويد'];
+  const NC = () => S().cats.notes;
   const FCATS = ['تفسير', 'تجويد', 'متشابهات', 'علوم القرآن', 'أخرى'];
 
   /* ---------- notes ---------- */
@@ -11,20 +11,22 @@ const Journal = (() => {
     const q = flt.trim();
     const list = S().notes.filter(n => (!cat || n.cat === cat) && (!q || (n.title + ' ' + n.text).includes(q)));
     return `<input type="search" placeholder="ابحث في ملاحظاتك" data-i="noteFlt" value="${esc(flt)}">
-      ${W.chips('noteCat', [['', 'الكل']].concat(NCATS.map(c => [c, c])), cat)}
+      ${W.chips('noteCat', [['', 'الكل']].concat(NC().map(c => [c, c])), cat)}
+      <button class="btn sm" data-a="catsManage" data-k="notes">${ic('folder')} إدارة التقسيمات</button>
       <div id="nlist">${list.length ? list.map(n => `<article class="card note" data-a="noteEdit" data-id="${n.id}">
         <div class="row"><b class="grow">${esc(n.title || n.text.slice(0, 40))}</b><span class="tag">${esc(n.cat)}</span></div>
         <p>${esc(n.text)}</p><small class="mut">${n.g != null ? ic('link') + ' ' + F.ayahRef(n.g) + ' · ' : ''}${F.ts(n.ts)}</small></article>`).join('')
       : W.empty('note', 'لا ملاحظات بعد', 'دوّن فوائد التفسير، والمتشابهات، وأخطاءك في التلاوة؛ أو اضغط آية في المصحف واكتب ملاحظة عليها.')}</div>`;
   };
   const editNote = (id, g) => {
-    const n = id ? S().notes.find(x => x.id === id) : { id: '', title: '', text: '', cat: 'عامة', g };
+    const n = id ? S().notes.find(x => x.id === id) : { id: '', title: '', text: '', cat: cat || NC()[0] || 'عامة', g };
     if (!n) return;
     UI.sheet(`<h3>${id ? 'تعديل الملاحظة' : 'ملاحظة جديدة'}</h3>
       ${n.g != null ? `<p class="qline">${W.ayah(n.g)}</p><small class="mut">${F.ayahRef(n.g)}</small>` : ''}
       <input type="text" id="n-title" placeholder="العنوان (اختياري)" value="${esc(n.title)}">
       <textarea id="n-text" rows="6" placeholder="اكتب ملاحظتك…">${esc(n.text)}</textarea>
-      <select id="n-cat">${NCATS.map(c => `<option ${c === n.cat ? 'selected' : ''}>${c}</option>`).join('')}</select>
+      <select id="n-cat">${NC().concat(NC().includes(n.cat) ? [] : [n.cat]).map(c => `<option ${c === n.cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+      <input type="text" id="n-newcat" placeholder="أو اكتب اسم تقسيمة جديدة">
       <div class="row gap"><button class="btn pri grow" data-a="noteSave" data-id="${n.id}" data-g="${n.g != null ? n.g : ''}">حفظ</button>
       ${n.g != null ? `<button class="btn" data-a="noteGo" data-g="${n.g}">${ic('book')}</button>` : ''}
       ${id ? `<button class="btn danger" data-a="noteDel" data-id="${n.id}">${ic('trash')}</button>` : ''}</div>`);
@@ -35,7 +37,9 @@ const Journal = (() => {
   Act.noteSave = el => {
     const text = $('#n-text').value.trim(), title = $('#n-title').value.trim();
     if (!text && !title) { UI.toast('اكتب شيئًا أولًا'); return; }
-    const id = el.dataset.id, o = { title, text, cat: $('#n-cat').value, ts: Date.now() };
+    const nc = $('#n-newcat').value.trim();
+    if (nc && !NC().includes(nc)) NC().push(nc);
+    const id = el.dataset.id, o = { title, text, cat: nc || $('#n-cat').value, ts: Date.now() };
     if (id) Object.assign(S().notes.find(x => x.id === id), o);
     else S().notes.unshift(Object.assign({ id: newId(), g: el.dataset.g === '' ? null : +el.dataset.g }, o));
     Store.save(); Badges.check(); UI.closeSheet(); UI.refresh(); UI.toast('حُفظت الملاحظة');
@@ -43,6 +47,7 @@ const Journal = (() => {
   Act.noteDel = el => UI.confirm('حذف هذه الملاحظة؟', 'حذف', () => { S().notes = S().notes.filter(x => x.id !== el.dataset.id); Store.save(); UI.refresh(); }, true);
   Chg.noteFlt = el => { flt = el.value; const y = $('#nlist'); const tmp = document.createElement('div'); tmp.innerHTML = notesHtml(); y.innerHTML = $('#nlist', tmp).innerHTML; };
   Act.noteCat = el => { cat = el.dataset.v; UI.refresh(); };
+  document.addEventListener('catschange', () => { if (cat && !NC().includes(cat)) cat = ''; });
 
   /* ---------- recordings ---------- */
   const recsHtml = () => {
@@ -134,39 +139,46 @@ const Journal = (() => {
       const url = URL.createObjectURL(blob); let obs = null, doc = null;
       viewerCleanup = () => { URL.revokeObjectURL(url); if (obs) obs.disconnect(); if (doc) doc.destroy(); viewerCleanup = null; };
       root.className = 'viewer';
-      if (f.kind === 'img') root.innerHTML = `<img src="${url}" alt="">`;
+      if (f.kind === 'img') { root.className = 'viewer pdfv'; root.innerHTML = `<div id="imgz"><img src="${url}" alt=""></div>`; Zoom.attach(root, $('#imgz', root)); }
       else if (f.kind === 'audio') root.innerHTML = `<div class="pad"><audio controls src="${url}"></audio></div>`;
       else if (f.kind === 'video') root.innerHTML = `<video controls src="${url}"></video>`;
       else if (f.kind === 'text') { root.innerHTML = '<pre class="txt" dir="auto"></pre>'; blob.text().then(t => { const p = $('.txt', root); if (p) p.textContent = t; }); }
       else if (f.kind === 'pdf') {
+        root.className = 'viewer pdfv';
         root.innerHTML = '<p class="c mut pad" id="pdf-msg">جارٍ فتح الملف…</p><div id="pdf"></div>';
         (async () => {
           try {
             if (!pdfLib) { pdfLib = await import('../pdfjs/pdf.min.mjs'); pdfLib.GlobalWorkerOptions.workerSrc = 'pdfjs/pdf.worker.min.mjs'; }
             doc = await pdfLib.getDocument({ data: await blob.arrayBuffer(), standardFontDataUrl: 'pdfjs/standard_fonts/' }).promise;
             const host = $('#pdf', root); if (!host) return;
-            $('#pdf-msg', root).remove();
-            const x = $('#bar-x'); if (x) x.textContent = `${num(doc.numPages)} ص`;
-            const first = await doc.getPage(1), vp0 = first.getViewport({ scale: 1 }), wCss = host.clientWidth || 360, ratio = vp0.height / vp0.width;
+            $('#pdf-msg', root).hidden = true;
+            const first = await doc.getPage(1), vp0 = first.getViewport({ scale: 1 });
             const draw = async holder => {
               if (holder.dataset.done) return; holder.dataset.done = 1;
               const page = await doc.getPage(+holder.dataset.p), dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-              const vp = page.getViewport({ scale: wCss / page.getViewport({ scale: 1 }).width * dpr });
+              const px = Math.min(host.clientWidth * dpr, 3600); // sharper when zoomed in
+              const vp = page.getViewport({ scale: px / page.getViewport({ scale: 1 }).width });
               const cv = document.createElement('canvas'); cv.width = vp.width; cv.height = vp.height;
-              holder.style.height = 'auto'; holder.appendChild(cv);
               await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+              const old = $('canvas', holder); if (old) holder.removeChild(old);
+              holder.style.aspectRatio = `${vp.width} / ${vp.height}`; holder.appendChild(cv);
             };
             obs = new IntersectionObserver(es => es.forEach(en => {
               if (!en.isIntersecting) return;
               draw(en.target);
               const p = +en.target.dataset.p; if (f.last !== p) { f.last = p; Store.save(); }
-            }), { root: $('#view'), rootMargin: '600px 0px' });
+            }), { root, rootMargin: '600px 0px' });
             for (let p = 1; p <= doc.numPages; p++) {
-              const h = document.createElement('div'); h.className = 'pdfp'; h.dataset.p = p; h.style.height = wCss * ratio + 'px';
+              const h = document.createElement('div'); h.className = 'pdfp'; h.dataset.p = p; h.style.aspectRatio = `${vp0.width} / ${vp0.height}`;
               h.innerHTML = `<span>${num(p)}</span>`; host.appendChild(h); obs.observe(h);
             }
+            const z = Zoom.attach(root, host, () => { // re-render at the new size
+              $$('.pdfp', host).forEach(h => { h.dataset.done = ''; obs.unobserve(h); obs.observe(h); });
+            });
+            const x = $('#bar-x');
+            if (x) { x.innerHTML = `<button class="ib sm" data-a="pdfZoom" data-v="0.7">${ic('zout')}</button><button class="ib sm" data-a="pdfZoom" data-v="1.4">${ic('zin')}</button> ${num(doc.numPages)} ص`; Act.pdfZoom = el => z.step(+el.dataset.v); }
             if (f.last > 1) { const t = host.children[f.last - 1]; if (t) t.scrollIntoView(); }
-          } catch (err) { console.error(err); const m = $('#pdf-msg', root); if (m) m.textContent = 'تعذّر فتح هذا الملف'; }
+          } catch (err) { console.error(err); const m = $('#pdf-msg', root); if (m) { m.hidden = false; m.textContent = 'تعذّر فتح هذا الملف'; } }
         })();
       } else root.innerHTML = `<div class="pad">${W.empty('file', 'لا يمكن عرض هذا النوع داخل التطبيق', 'يمكنك تصدير نسخة منه وفتحها بتطبيق آخر.')}<button class="btn pri grow" data-a="fileExport" data-id="${f.id}">${ic('download')} تصدير</button></div>`;
     }, () => { if (viewerCleanup) viewerCleanup(); });

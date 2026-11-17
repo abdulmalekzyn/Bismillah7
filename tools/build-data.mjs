@@ -44,6 +44,24 @@ const data = {
 };
 fs.writeFileSync(path.join(www, 'data/quran.js'), 'window.QDATA=' + JSON.stringify(data) + ';\n');
 
+// Search index: imla'i (simple) text from quran-json@2.0.0 (Al Quran Cloud "quran-simple"), reduced to bare letters.
+// It is only used to find ayahs when the user types without tashkeel; it is never displayed.
+const bare = s => s.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/\s+/g, ' ').trim();
+const BASM = bare('بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ');
+const idx = [];
+for (let s = 1; s <= 114; s++) {
+  const su = require(`quran-json-simple/surahs/${s}.json`);
+  if (su.verses.length !== surahs[s - 1].count) throw new Error('search index: verse count mismatch in surah ' + s);
+  su.verses.forEach((v, i) => {
+    let t = bare(v.text);
+    if (i === 0 && s !== 1 && s !== 9) { if (!t.startsWith(BASM + ' ')) throw new Error('search index: no basmala prefix in ' + s); t = t.slice(BASM.length + 1); }
+    if (!t) throw new Error('search index: empty ayah');
+    idx.push(t);
+  });
+}
+if (idx.length !== 6236) throw new Error('search index size');
+fs.writeFileSync(path.join(www, 'data/search.js'), 'window.QSEARCH=' + JSON.stringify(idx.join('\n')) + ';\n');
+
 const nm = p => path.join(here, 'node_modules', p);
 const cp = (from, to) => { fs.mkdirSync(path.dirname(to), { recursive: true }); fs.copyFileSync(from, to); };
 // The mushaf font (KFGQPC HAFS Uthmanic Script v18) is committed in assets/fonts: the QuranEnc text uses its encoding.

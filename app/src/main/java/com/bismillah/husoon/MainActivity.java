@@ -22,6 +22,8 @@ import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -41,6 +43,7 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> fileCallback;
     private PermissionRequest pendingMic;
     private byte[] pendingSave;
+    private Downloader downloader;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -55,12 +58,24 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(false);
         s.setAllowContentAccess(true);
         s.setTextZoom(100);
+        // the page has its own light/dark themes: never let the WebView darken it by itself
+        if (Build.VERSION.SDK_INT >= 33) s.setAlgorithmicDarkeningAllowed(false);
+        else if (Build.VERSION.SDK_INT >= 29) forceDarkOff(s);
+        downloader = new Downloader(new File(getFilesDir(), "dl"), (job, done, total, failed, finished) ->
+                runOnUiThread(() -> {
+                    if (web != null) web.evaluateJavascript("window.onDl&&window.onDl(" + org.json.JSONObject.quote(job) + "," + done + "," + total + "," + failed + "," + finished + ")", null);
+                }));
         web.setOverScrollMode(WebView.OVER_SCROLL_NEVER);
         web.setWebViewClient(new Client());
         web.setWebChromeClient(new Chrome());
         web.addJavascriptInterface(new Bridge(), "Android");
         if (state == null || web.restoreState(state) == null) web.loadUrl(START);
         Reminders.scheduleAll(this);
+    }
+
+    @SuppressWarnings("deprecation")
+    private static void forceDarkOff(WebSettings s) {
+        s.setForceDark(WebSettings.FORCE_DARK_OFF);
     }
 
     @Override
@@ -71,7 +86,9 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        downloader.shutdown();
         web.destroy();
+        web = null;
         super.onDestroy();
     }
 
@@ -95,6 +112,8 @@ public class MainActivity extends Activity {
             case "ttf": return "font/ttf";
             case "svg": return "image/svg+xml";
             case "png": return "image/png";
+            case "jpg": return "image/jpeg";
+            case "mp3": return "audio/mpeg";
             case "txt": return "text/plain";
             default: return "application/octet-stream";
         }
@@ -108,12 +127,23 @@ public class MainActivity extends Activity {
             String path = u.getPath();
             if (path == null || path.equals("/")) path = "/index.html";
             String type = mime(path);
+            Map<String, String> headers = new HashMap<>();
+            if (path.startsWith("/dl/")) { // downloaded files (recitations)
+                File f = downloader.resolve(path.substring(4));
+                try {
+                    if (f == null || !f.isFile()) throw new IOException("missing");
+                    headers.put("Content-Length", String.valueOf(f.length()));
+                    headers.put("Cache-Control", "max-age=31536000");
+                    return new WebResourceResponse(type, null, 200, "OK", headers, new FileInputStream(f));
+                } catch (IOException e) {
+                    return new WebResourceResponse("text/plain", "utf-8", 404, "Not Found", headers, new ByteArrayInputStream(new byte[0]));
+                }
+            }
             boolean text = type.startsWith("text/") || type.equals("application/json") || type.equals("image/svg+xml");
             try {
                 InputStream in = getAssets().open("www" + path);
                 return new WebResourceResponse(type, text ? "utf-8" : null, in);
             } catch (IOException e) {
-                Map<String, String> headers = new HashMap<>();
                 return new WebResourceResponse("text/plain", "utf-8", 404, "Not Found", headers, new ByteArrayInputStream(new byte[0]));
             }
         }
@@ -221,6 +251,39 @@ public class MainActivity extends Activity {
                     requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIF);
                 }
             });
+        }
+
+        @JavascriptInterface
+        public void setDark(boolean dark) {
+            runOnUiThread(() -> getWindow().setStatusBarColor(dark ? 0xFF0B2A20 : 0xFF0A4D39));
+        }
+
+        @JavascriptInterface
+        public boolean fileExists(String path) {
+            File f = downloader.resolve(path);
+            return f != null && f.isFile() && f.length() > 0;
+        }
+
+        @JavascriptInterface
+        public String dirInfo(String path) {
+            long[] x = Downloader.info(downloader.resolve(path));
+            return "{\"n\":" + x[0] + ",\"bytes\":" + x[1] + "}";
+        }
+
+        @JavascriptInterface
+        public void deleteDir(String path) {
+            File f = downloader.resolve(path);
+            if (f != null) Downloader.deleteTree(f);
+        }
+
+        @JavascriptInterface
+        public void dlStart(String jobId, String json) {
+            downloader.start(jobId, json);
+        }
+
+        @JavascriptInterface
+        public void dlCancel(String jobId) {
+            downloader.cancel(jobId);
         }
 
         @JavascriptInterface

@@ -4,12 +4,14 @@
 @font-face { font-family: Tajawal; font-weight: 700; src: url(../fonts/tajawal-700.woff2) format("woff2"); }
 
 :root {
+  color-scheme: light;
   --bg: #f5f1e6; --card: #fffdf7; --ink: #1d2a23; --mut: #6c776f; --line: #e5dcc8;
   --pri: #0f6b4f; --pri-ink: #fff; --pri-d: #0a4d39; --soft: #e4f0e8; --gold: #b0842a; --gold-s: #f6ecd2;
   --red: #b23b2a; --red-s: #f8e3de; --page: #fffaf0; --hide: #e7dfca; --shadow: 0 1px 2px rgba(60, 50, 20, .06), 0 4px 14px rgba(60, 50, 20, .05);
   --qsize: 26px; --tabs: 62px;
 }
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0e1411; --card: #172019; --ink: #e7ece6; --mut: #94a299; --line: #26332b;
   --pri: #3aa37d; --pri-ink: #06140e; --pri-d: #0f3d2e; --soft: #1a2b23; --gold: #d3a94f; --gold-s: #2c2613;
   --red: #e07a68; --red-s: #3a1f1a; --page: #141c17; --hide: #26332b; --shadow: 0 1px 2px rgba(0, 0, 0, .3);
@@ -192,3 +194,19 @@ textarea { resize: vertical; line-height: 1.8; }
 .grab { width: 42px; height: 5px; border-radius: 99px; background: var(--line); margin: 2px auto 6px; flex: none; }
 #toast { position: fixed; bottom: calc(var(--tabs) + 26px); left: 50%; transform: translateX(-50%); z-index: 60; background: var(--ink); color: var(--bg); padding: 9px 18px; border-radius: 99px; font-size: 14px; font-weight: 500; max-width: 88vw; text-align: center; box-shadow: 0 6px 20px rgba(0, 0, 0, .25); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* v1.1: editions, tafsir, downloads, zoom */
+.mbar .ib { width: 38px; height: 42px; }
+.page-wrap.img { padding: 0; overflow: auto; touch-action: pan-x pan-y; }
+.pimg-box { width: 100%; } .pimg { width: 100%; display: block; background: #fff; min-height: 40vh; }
+:root[data-theme="dark"] .pimg { filter: invert(1) hue-rotate(180deg) brightness(.92); background: #000; }
+#sub.pdfv { position: absolute; top: 55px; bottom: 0; left: 0; right: 0; overflow: auto; touch-action: pan-x pan-y; direction: ltr; background: var(--line); }
+#sub.pdfv #pdf, #imgz { width: 100%; } #imgz img { width: 100%; display: block; }
+.pdfp { width: 100%; }
+.bar-x { display: flex; align-items: center; gap: 2px; white-space: nowrap; }
+.tfbody { margin-top: 12px; padding: 14px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); font-size: 16.5px; line-height: 2.05; -webkit-user-select: text; user-select: text; min-height: 120px; }
+.tfbody p + p { margin-top: 10px; }
+.dlp { margin-top: 8px; } .dlp .prog { margin-bottom: 6px; }
+.qline.one { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; font-weight: 400; }
+.mcard b { display: block; }
+.agrid span { text-align: center; line-height: 1.3; }

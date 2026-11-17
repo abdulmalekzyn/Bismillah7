@@ -24,7 +24,12 @@ const ICONS = {
   play: 'M7 4l13 8-13 8z', pause: 'M7 4v16M17 4v16', stop: 'M6 6h12v12H6z',
   plus: 'M12 5v14M5 12h14', x: 'M6 6l12 12M18 6L6 18',
   next: 'M15 5l-7 7 7 7', prev: 'M9 5l7 7-7 7', back: 'M9 5l7 7-7 7',
-  gear: 'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1',
+  sun: 'M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1',
+  gear: 'M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M9 10v4M17 16v4',
+  bookmark: 'M6 3h12v18l-6-4-6 4z',
+  zin: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4M8 11h6M11 8v6', zout: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4M8 11h6',
+  image: 'M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M15 9h.01',
+  folder: 'M3 6h6l2 2h10v11H3z',
   trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6',
   flame: 'M12 3s5 4 5 9a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-8z',
   flag: 'M5 21V4M5 4h11l-2 4 2 4H5',
@@ -97,10 +102,11 @@ const UI = (() => {
     Act.confirmYes = () => { closeSheet(); cb(); };
   };
   const vibrate = p => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+  const isDark = () => { const t = Store.S.ui.theme; return t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches); };
   const theme = () => {
-    const t = Store.S.ui.theme;
-    const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+    const dark = isDark();
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    if (Native && Native.setDark) Native.setDark(dark);
     document.documentElement.style.setProperty('--qsize', Store.S.ui.font + 'px');
   };
   const back = () => { // returns true when handled
@@ -117,12 +123,13 @@ const UI = (() => {
   const onChg = e => { const el = e.target.closest('[data-c]'); if (el && Chg[el.dataset.c]) Chg[el.dataset.c](el, e); };
   document.addEventListener('change', onChg);
   document.addEventListener('input', e => { const el = e.target.closest('[data-i]'); if (el && Chg[el.dataset.i]) Chg[el.dataset.i](el, e); });
+  Act.themeToggle = () => { Store.S.ui.theme = isDark() ? 'light' : 'dark'; Store.save(); theme(); refresh(); };
   Act.tab = el => go(el.dataset.id);
   Act.back = () => back();
   Act.sheetClose = () => closeSheet();
   window.onAndroidBack = () => back();
 
-  return { screens, render, refresh, go, push, pop, sheet, closeSheet, toast, confirm, vibrate, theme, back, get tab() { return tab; }, get depth() { return stack.length; } };
+  return { screens, render, refresh, go, push, pop, sheet, closeSheet, toast, confirm, vibrate, theme, isDark, back, get tab() { return tab; }, get depth() { return stack.length; } };
 })();
 
 /* shared small widgets */
