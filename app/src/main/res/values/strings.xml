@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">حصون الحفظ</string>
+    <string name="channel_name">تذكير الأوراد</string>
+    <string name="channel_desc">تنبيهات يومية بأوراد الحفظ والمراجعة</string>
+</resources>

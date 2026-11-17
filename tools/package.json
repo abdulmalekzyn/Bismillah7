@@ -1,0 +1,12 @@
+{
+  "name": "husoon-tools",
+  "private": true,
+  "type": "module",
+  "scripts": { "build-data": "node build-data.mjs" },
+  "dependencies": {
+    "@fontsource/tajawal": "5.3.0",
+    "pdfjs-dist": "^4.10.38",
+    "quran-json": "3.1.2",
+    "quran-meta": "7.0.0"
+  }
+}

@@ -1,0 +1,5 @@
+KFGQPC-Uthmanic-Hafs-v18.ttf — "KFGQPC HAFS Uthmanic Script", (c) 2010 King Fahd Glorious Quran
+Printing Complex, Al-Madinah Al-Munawwarah. Shipped unmodified. Its embedded end-user licence grants,
+free of cost, the rights to use, copy and distribute the font; it may not be sold or modified.
+
+tajawal-*.woff2 — Tajawal, (c) Boutros Fonts, SIL Open Font License 1.1 (via @fontsource/tajawal).

@@ -1,0 +1,47 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.bismillah.husoon'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.bismillah.husoon'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    // A fixed key committed to the repo so every CI build can be installed over the previous one.
+    // It is NOT secret: replace it with your own private key before publishing to a store.
+    signingConfigs {
+        shared {
+            storeFile rootProject.file('keystore/husoon.jks')
+            storePassword 'husoon-app'
+            keyAlias 'husoon'
+            keyPassword 'husoon-app'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.shared
+        }
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.shared
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
